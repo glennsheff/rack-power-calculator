@@ -91,13 +91,79 @@ const HardwareContext = createContext<HardwareContextValue | null>(null);
 // Provider
 // ---------------------------------------------------------------------------
 
+// Current schema version — bump this when the default data or schema changes
+const SCHEMA_VERSION = 2;
+
+function getSchemaVersion(): number {
+  try {
+    const raw = localStorage.getItem('aifi-rack-schema-version');
+    return raw ? parseInt(raw, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setSchemaVersion(v: number): void {
+  localStorage.setItem('aifi-rack-schema-version', v.toString());
+}
+
+function migrateHardware(items: HardwareItem[]): HardwareItem[] {
+  return items.map((item) => {
+    const migrated = { ...item };
+
+    // v1 → v2: isActive (boolean) → status (HardwareStatus)
+    if (!('status' in migrated) || !migrated.status) {
+      const legacy = item as unknown as Record<string, unknown>;
+      if (legacy.isActive === false) {
+        migrated.status = 'eol';
+      } else {
+        migrated.status = 'active';
+      }
+      delete (migrated as Record<string, unknown>).isActive;
+    }
+
+    // v1 → v2: camera-controller → camera or controller
+    if ((migrated.category as string) === 'camera-controller') {
+      const nameLower = migrated.name.toLowerCase();
+      if (nameLower.includes('controller') || nameLower.includes('dataprobe') || nameLower.includes('raspberry')) {
+        migrated.category = 'controller';
+      } else {
+        migrated.category = 'camera';
+      }
+    }
+
+    return migrated;
+  });
+}
+
 function loadInitialHardware(): HardwareItem[] {
   if (!isSeeded()) {
+    // First ever visit — seed with defaults
     setHardwareLibrary(DEFAULT_HARDWARE);
     markSeeded();
+    setSchemaVersion(SCHEMA_VERSION);
     return DEFAULT_HARDWARE;
   }
-  return getHardwareLibrary();
+
+  let existing = getHardwareLibrary();
+  const currentVersion = getSchemaVersion();
+
+  if (currentVersion < SCHEMA_VERSION) {
+    // Migrate existing items to new schema
+    existing = migrateHardware(existing);
+
+    // Merge in any new seed items that don't exist yet (by seed id)
+    const existingIds = new Set(existing.map((h) => h.id));
+    const newSeedItems = DEFAULT_HARDWARE.filter((d) => !existingIds.has(d.id));
+    if (newSeedItems.length > 0) {
+      existing = [...existing, ...newSeedItems];
+    }
+
+    setHardwareLibrary(existing);
+    setSchemaVersion(SCHEMA_VERSION);
+  }
+
+  return existing;
 }
 
 export function HardwareProvider({ children }: { children: ReactNode }) {
