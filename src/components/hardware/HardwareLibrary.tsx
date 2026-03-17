@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { HardwareItem, HardwareCategory } from '../../types';
+import type { HardwareItem, HardwareCategory, HardwareStatus } from '../../types';
 import { HARDWARE_CATEGORIES } from '../../types';
 import { useHardware } from '../../context/HardwareContext';
 import { useToast } from '../ui/Toast';
@@ -10,7 +10,7 @@ import { HardwareTable } from './HardwareTable';
 import { HardwareImportExport } from './HardwareImportExport';
 
 export function HardwareLibrary() {
-  const { hardware, addHardware, updateHardware, deleteHardware, toggleActive } = useHardware();
+  const { hardware, addHardware, updateHardware, deleteHardware, setStatus } = useHardware();
   const { addToast } = useToast();
 
   const [selectedCategory, setSelectedCategory] = useState<HardwareCategory | null>(null);
@@ -69,14 +69,12 @@ export function HardwareLibrary() {
     addToast(`"${item?.name ?? 'Item'}" deleted`, 'success');
   }
 
-  function handleToggleActive(id: string) {
+  function handleSetStatus(id: string, status: HardwareStatus) {
     const item = hardware.find((h) => h.id === id);
-    toggleActive(id);
+    setStatus(id, status);
     if (item) {
-      addToast(
-        `"${item.name}" ${item.isActive ? 'deactivated' : 'activated'}`,
-        'info'
-      );
+      const labels: Record<HardwareStatus, string> = { active: 'Active', 'in-testing': 'In Testing', eol: 'EOL' };
+      addToast(`"${item.name}" set to ${labels[status]}`, 'info');
     }
   }
 
@@ -171,7 +169,7 @@ export function HardwareLibrary() {
       <HardwareTable
         items={filteredItems}
         onEdit={openEditModal}
-        onToggleActive={handleToggleActive}
+        onSetStatus={handleSetStatus}
         onDelete={handleDelete}
       />
 

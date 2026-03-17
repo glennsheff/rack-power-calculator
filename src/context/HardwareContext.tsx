@@ -6,7 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import type { HardwareItem } from '../types';
+import type { HardwareItem, HardwareStatus } from '../types';
 import {
   getHardwareLibrary,
   setHardwareLibrary,
@@ -28,7 +28,7 @@ type HardwareAction =
   | { type: 'ADD'; payload: HardwareItem }
   | { type: 'UPDATE'; payload: { id: string; updates: Partial<HardwareItem> } }
   | { type: 'DELETE'; payload: string }
-  | { type: 'TOGGLE_ACTIVE'; payload: string }
+  | { type: 'SET_STATUS'; payload: { id: string; status: HardwareStatus } }
   | { type: 'IMPORT'; payload: HardwareItem[] };
 
 function hardwareReducer(state: HardwareState, action: HardwareAction): HardwareState {
@@ -53,11 +53,11 @@ function hardwareReducer(state: HardwareState, action: HardwareAction): Hardware
         hardware: state.hardware.filter((item) => item.id !== action.payload),
       };
 
-    case 'TOGGLE_ACTIVE':
+    case 'SET_STATUS':
       return {
         hardware: state.hardware.map((item) =>
-          item.id === action.payload
-            ? { ...item, isActive: !item.isActive, updatedAt: new Date().toISOString() }
+          item.id === action.payload.id
+            ? { ...item, status: action.payload.status, updatedAt: new Date().toISOString() }
             : item,
         ),
       };
@@ -79,7 +79,7 @@ interface HardwareContextValue {
   addHardware: (item: Omit<HardwareItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateHardware: (id: string, updates: Partial<HardwareItem>) => void;
   deleteHardware: (id: string) => void;
-  toggleActive: (id: string) => void;
+  setStatus: (id: string, status: HardwareStatus) => void;
   importHardware: (items: HardwareItem[]) => void;
   exportHardware: () => HardwareItem[];
   getActiveHardware: () => HardwareItem[];
@@ -132,8 +132,8 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'DELETE', payload: id });
   }, []);
 
-  const toggleActive = useCallback((id: string) => {
-    dispatch({ type: 'TOGGLE_ACTIVE', payload: id });
+  const setStatus = useCallback((id: string, status: HardwareStatus) => {
+    dispatch({ type: 'SET_STATUS', payload: { id, status } });
   }, []);
 
   const importHardware = useCallback((items: HardwareItem[]) => {
@@ -145,7 +145,7 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
   }, [state.hardware]);
 
   const getActiveHardware = useCallback((): HardwareItem[] => {
-    return state.hardware.filter((item) => item.isActive);
+    return state.hardware.filter((item) => item.status === 'active');
   }, [state.hardware]);
 
   return (
@@ -155,7 +155,7 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
         addHardware,
         updateHardware,
         deleteHardware,
-        toggleActive,
+        setStatus,
         importHardware,
         exportHardware,
         getActiveHardware,

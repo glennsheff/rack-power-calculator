@@ -11,7 +11,7 @@ export interface HardwareItem {
   rackUnits: number;
   weight_kg: number;
   notes: string;
-  isActive: boolean;
+  status: HardwareStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,7 +19,8 @@ export interface HardwareItem {
 export type HardwareCategory =
   | 'server'
   | 'switch'
-  | 'camera-controller'
+  | 'camera'
+  | 'controller'
   | 'ups'
   | 'pdu'
   | 'storage'
@@ -31,7 +32,8 @@ export type HardwareCategory =
 export const HARDWARE_CATEGORIES: { value: HardwareCategory; label: string }[] = [
   { value: 'server', label: 'Server' },
   { value: 'switch', label: 'Network Switch' },
-  { value: 'camera-controller', label: 'Camera Controller' },
+  { value: 'camera', label: 'Camera' },
+  { value: 'controller', label: 'Controller' },
   { value: 'ups', label: 'UPS' },
   { value: 'pdu', label: 'PDU' },
   { value: 'storage', label: 'Storage' },
@@ -39,6 +41,14 @@ export const HARDWARE_CATEGORIES: { value: HardwareCategory; label: string }[] =
   { value: 'display', label: 'Display' },
   { value: 'accessory', label: 'Accessory' },
   { value: 'other', label: 'Other' },
+];
+
+export type HardwareStatus = 'active' | 'in-testing' | 'eol';
+
+export const HARDWARE_STATUSES: { value: HardwareStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'in-testing', label: 'In Testing' },
+  { value: 'eol', label: 'EOL' },
 ];
 
 export interface RackItem {

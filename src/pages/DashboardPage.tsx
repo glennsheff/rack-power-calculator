@@ -7,7 +7,7 @@ export default function DashboardPage() {
   const { savedConfigs } = useRack();
   const navigate = useNavigate();
 
-  const activeHardware = hardware.filter((h) => h.isActive).length;
+  const activeHardware = hardware.filter((h) => h.status === 'active').length;
   const categories = new Set(hardware.map((h) => h.category)).size;
 
   return (

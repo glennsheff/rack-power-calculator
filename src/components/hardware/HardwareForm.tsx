@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { HardwareItem, HardwareCategory } from '../../types';
-import { HARDWARE_CATEGORIES } from '../../types';
+import type { HardwareItem, HardwareCategory, HardwareStatus } from '../../types';
+import { HARDWARE_CATEGORIES, HARDWARE_STATUSES } from '../../types';
 import { Input, TextArea } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
@@ -15,6 +15,7 @@ interface FormData {
   name: string;
   model: string;
   category: HardwareCategory;
+  status: HardwareStatus;
   powerWatts: string;
   peakPowerWatts: string;
   heatOutputBTU: string;
@@ -41,6 +42,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
     name: item?.name ?? '',
     model: item?.model ?? '',
     category: item?.category ?? 'server',
+    status: item?.status ?? 'active',
     powerWatts: item?.powerWatts?.toString() ?? '',
     peakPowerWatts: item?.peakPowerWatts?.toString() ?? '',
     heatOutputBTU: item?.heatOutputBTU?.toString() ?? '0',
@@ -114,6 +116,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
       name: formData.name.trim(),
       model: formData.model.trim(),
       category: formData.category,
+      status: formData.status,
       powerWatts,
       peakPowerWatts: Number(formData.peakPowerWatts),
       heatOutputBTU: heatBTU > 0 ? heatBTU : Math.round(powerWatts * 3.412),
@@ -122,7 +125,6 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
       rackUnits: Number(formData.rackUnits) || 0,
       weight_kg: Number(formData.weight_kg) || 0,
       notes: formData.notes.trim(),
-      isActive: item?.isActive ?? true,
     });
   }
 
@@ -155,12 +157,20 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
         />
       </div>
 
-      <Select
-        label="Category"
-        value={formData.category}
-        onChange={(e) => updateField('category', e.target.value)}
-        options={HARDWARE_CATEGORIES}
-      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select
+          label="Category"
+          value={formData.category}
+          onChange={(e) => updateField('category', e.target.value)}
+          options={HARDWARE_CATEGORIES}
+        />
+        <Select
+          label="Status"
+          value={formData.status}
+          onChange={(e) => updateField('status', e.target.value)}
+          options={HARDWARE_STATUSES}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input

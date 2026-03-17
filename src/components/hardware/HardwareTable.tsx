@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import type { HardwareItem } from '../../types';
-import { HARDWARE_CATEGORIES } from '../../types';
+import type { HardwareItem, HardwareStatus } from '../../types';
+import { HARDWARE_CATEGORIES, HARDWARE_STATUSES } from '../../types';
 import { Badge } from '../ui/Badge';
 
 interface HardwareTableProps {
   items: HardwareItem[];
   onEdit: (item: HardwareItem) => void;
-  onToggleActive: (id: string) => void;
+  onSetStatus: (id: string, status: HardwareStatus) => void;
   onDelete: (id: string) => void;
 }
 
-type SortKey = 'name' | 'model' | 'category' | 'powerWatts' | 'peakPowerWatts' | 'heatOutputBTU' | 'rackUnits' | 'isActive';
+type SortKey = 'name' | 'model' | 'category' | 'powerWatts' | 'peakPowerWatts' | 'heatOutputBTU' | 'rackUnits' | 'status';
 type SortDir = 'asc' | 'desc';
 
 function getCategoryLabel(value: string): string {
@@ -23,6 +23,10 @@ function getCategoryBadgeVariant(category: string): 'blue' | 'gray' | 'green' | 
       return 'blue';
     case 'switch':
       return 'green';
+    case 'camera':
+      return 'yellow';
+    case 'controller':
+      return 'blue';
     case 'ups':
     case 'pdu':
       return 'yellow';
@@ -33,7 +37,7 @@ function getCategoryBadgeVariant(category: string): 'blue' | 'gray' | 'green' | 
   }
 }
 
-export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: HardwareTableProps) {
+export function HardwareTable({ items, onEdit, onSetStatus, onDelete }: HardwareTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -85,12 +89,11 @@ export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: Hardw
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(id);
+      // Auto-clear confirmation after 3 seconds
+      setTimeout(() => {
+        setConfirmDeleteId((current) => (current === id ? null : current));
+      }, 3000);
     }
-  }
-
-  // Reset confirm state when clicking elsewhere
-  function handleRowMouseLeave() {
-    setConfirmDeleteId(null);
   }
 
   if (items.length === 0) {
@@ -133,8 +136,8 @@ export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: Hardw
             <th className={`${headerClass} text-right`} onClick={() => handleSort('rackUnits')}>
               Rack U <SortArrow column="rackUnits" />
             </th>
-            <th className={headerClass} onClick={() => handleSort('isActive')}>
-              Status <SortArrow column="isActive" />
+            <th className={headerClass} onClick={() => handleSort('status')}>
+              Status <SortArrow column="status" />
             </th>
             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-aifi-black-60">
               Actions
@@ -145,8 +148,7 @@ export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: Hardw
           {sorted.map((item) => (
             <tr
               key={item.id}
-              className={`transition-colors hover:bg-aifi-gray-50/60 ${!item.isActive ? 'opacity-50' : ''}`}
-              onMouseLeave={handleRowMouseLeave}
+              className={`transition-colors hover:bg-aifi-gray-50/60 ${item.status === 'eol' ? 'opacity-50' : ''}`}
             >
               <td className="px-4 py-3 font-medium text-aifi-black">{item.name}</td>
               <td className="px-4 py-3 text-aifi-black-80">{item.model}</td>
@@ -168,9 +170,23 @@ export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: Hardw
                 {item.rackUnits}
               </td>
               <td className="px-4 py-3">
-                <Badge variant={item.isActive ? 'green' : 'red'}>
-                  {item.isActive ? 'Active' : 'Inactive'}
-                </Badge>
+                <select
+                  value={item.status}
+                  onChange={(e) => onSetStatus(item.id, e.target.value as HardwareStatus)}
+                  className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold border-0 focus:outline-none focus:ring-2 focus:ring-aifi-blue ${
+                    item.status === 'active'
+                      ? 'bg-green-50 text-green-700'
+                      : item.status === 'in-testing'
+                      ? 'bg-yellow-50 text-yellow-700'
+                      : 'bg-red-50 text-red-700'
+                  }`}
+                >
+                  {HARDWARE_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
@@ -186,40 +202,24 @@ export function HardwareTable({ items, onEdit, onToggleActive, onDelete }: Hardw
                     </svg>
                   </button>
 
-                  {/* Toggle active */}
-                  <button
-                    onClick={() => onToggleActive(item.id)}
-                    className="rounded-lg p-1.5 text-aifi-black-60 transition-colors hover:bg-aifi-blue-10 hover:text-aifi-blue focus:outline-none focus:ring-2 focus:ring-aifi-blue"
-                    aria-label={item.isActive ? `Deactivate ${item.name}` : `Activate ${item.name}`}
-                    title={item.isActive ? 'Deactivate' : 'Activate'}
-                  >
-                    {item.isActive ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                      </svg>
-                    )}
-                  </button>
-
                   {/* Delete */}
                   <button
                     onClick={() => handleDeleteClick(item.id)}
                     className={`rounded-lg p-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 ${
                       confirmDeleteId === item.id
-                        ? 'bg-red-50 text-red-600'
+                        ? 'bg-red-100 text-red-600'
                         : 'text-aifi-black-60 hover:bg-red-50 hover:text-red-500'
                     }`}
                     aria-label={confirmDeleteId === item.id ? `Confirm delete ${item.name}` : `Delete ${item.name}`}
-                    title={confirmDeleteId === item.id ? 'Click again to confirm' : 'Delete'}
+                    title={confirmDeleteId === item.id ? 'Click again to confirm delete' : 'Delete'}
                   >
                     {confirmDeleteId === item.id ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                      <span className="flex items-center gap-1 text-xs font-semibold">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Confirm
+                      </span>
                     ) : (
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

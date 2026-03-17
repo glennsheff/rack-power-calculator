@@ -14,7 +14,8 @@ interface HardwareSelectorProps {
 const CATEGORY_BADGE_VARIANT: Record<HardwareCategory, 'blue' | 'gray' | 'green' | 'red' | 'yellow'> = {
   server: 'blue',
   switch: 'green',
-  'camera-controller': 'yellow',
+  camera: 'yellow',
+  controller: 'blue',
   ups: 'red',
   pdu: 'gray',
   storage: 'blue',
