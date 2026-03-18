@@ -16,6 +16,7 @@ interface FormData {
   model: string;
   category: HardwareCategory;
   status: HardwareStatus;
+  poePowered: boolean;
   powerWatts: string;
   peakPowerWatts: string;
   heatOutputBTU: string;
@@ -43,6 +44,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
     model: item?.model ?? '',
     category: item?.category ?? 'server',
     status: item?.status ?? 'active',
+    poePowered: item?.poePowered ?? false,
     powerWatts: item?.powerWatts?.toString() ?? '',
     peakPowerWatts: item?.peakPowerWatts?.toString() ?? '',
     heatOutputBTU: item?.heatOutputBTU?.toString() ?? '0',
@@ -117,6 +119,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
       model: formData.model.trim(),
       category: formData.category,
       status: formData.status,
+      poePowered: formData.poePowered,
       powerWatts,
       peakPowerWatts: Number(formData.peakPowerWatts),
       heatOutputBTU: heatBTU > 0 ? heatBTU : Math.round(powerWatts * 3.412),
@@ -137,7 +140,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           label="Name"
@@ -172,9 +175,28 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
         />
       </div>
 
+      {/* PoE toggle */}
+      <div className="flex items-center gap-3 rounded-lg border border-aifi-gray bg-aifi-gray-50/50 px-4 py-3">
+        <label className="relative inline-flex cursor-pointer items-center">
+          <input
+            type="checkbox"
+            checked={formData.poePowered}
+            onChange={(e) => setFormData((prev) => ({ ...prev, poePowered: e.target.checked }))}
+            className="peer sr-only"
+          />
+          <div className="h-5 w-9 rounded-full bg-aifi-gray after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-aifi-blue peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-aifi-blue" />
+        </label>
+        <div>
+          <span className="text-sm font-semibold text-aifi-black">PoE Powered</span>
+          <p className="text-xs text-aifi-black-60">
+            Device draws power via PoE from a switch — its wattage won't be counted separately in the mains power total
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
-          label="Power Draw (Watts)"
+          label={formData.poePowered ? 'PoE Power Draw (Watts)' : 'Power Draw (Watts)'}
           type="number"
           min={0}
           value={formData.powerWatts}
@@ -184,7 +206,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
           required
         />
         <Input
-          label="Peak Power (Watts)"
+          label={formData.poePowered ? 'PoE Peak Power (Watts)' : 'Peak Power (Watts)'}
           type="number"
           min={0}
           value={formData.peakPowerWatts}
@@ -233,7 +255,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
           label="Rack Units (U)"
           type="number"
           min={0}
-          step={0.5}
+          step="any"
           value={formData.rackUnits}
           onChange={(e) => updateField('rackUnits', e.target.value)}
           placeholder="1"
@@ -243,7 +265,7 @@ export function HardwareForm({ item, onSubmit, onCancel }: HardwareFormProps) {
           label="Weight (kg)"
           type="number"
           min={0}
-          step={0.1}
+          step="any"
           value={formData.weight_kg}
           onChange={(e) => updateField('weight_kg', e.target.value)}
           placeholder="0"

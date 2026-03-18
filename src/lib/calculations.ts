@@ -57,19 +57,37 @@ export function calculatePower(
   let totalRackUnits = 0;
   let totalWeight_kg = 0;
 
+  // PoE tracking — these devices draw power from their PoE switch,
+  // so their wattage is NOT added to the mains total (the switch's
+  // peak power already includes its full PoE budget).
+  let poeDeviceWatts = 0;
+  let poeDevicePeakWatts = 0;
+  let poeDeviceCount = 0;
+
   for (const rackItem of items) {
     const hw = hardware.find(h => h.id === rackItem.hardwareId);
     if (!hw) continue;
 
     const qty = rackItem.quantity;
-    totalWatts += hw.powerWatts * qty;
-    totalPeakWatts += hw.peakPowerWatts * qty;
+
+    if (hw.poePowered) {
+      // Track PoE devices separately — do NOT add to mains totals
+      poeDeviceWatts += hw.powerWatts * qty;
+      poeDevicePeakWatts += hw.peakPowerWatts * qty;
+      poeDeviceCount += qty;
+    } else {
+      // Mains-powered devices — add to power totals
+      totalWatts += hw.powerWatts * qty;
+      totalPeakWatts += hw.peakPowerWatts * qty;
+
+      // Use specified BTU or calculate from watts
+      const btu = hw.heatOutputBTU > 0 ? hw.heatOutputBTU : hw.powerWatts * 3.412;
+      totalBTU += btu * qty;
+    }
+
+    // Always count physical space and weight regardless of power source
     totalRackUnits += hw.rackUnits * qty;
     totalWeight_kg += hw.weight_kg * qty;
-
-    // Use specified BTU or calculate from watts
-    const btu = hw.heatOutputBTU > 0 ? hw.heatOutputBTU : hw.powerWatts * 3.412;
-    totalBTU += btu * qty;
   }
 
   const voltage = getRegionVoltage(region);
@@ -87,6 +105,9 @@ export function calculatePower(
     totalRackUnits,
     totalWeight_kg,
     powerFactor: POWER_FACTOR,
+    poeDeviceWatts,
+    poeDevicePeakWatts,
+    poeDeviceCount,
   };
 }
 

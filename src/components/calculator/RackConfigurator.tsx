@@ -226,7 +226,14 @@ export function RackConfigurator() {
                     {resolvedRackItems.map((item) => (
                       <tr key={item.hardwareId} className="border-b border-aifi-gray/50 hover:bg-aifi-blue-10/30 transition-colors">
                         <td className="px-4 py-2.5">
-                          <div className="font-semibold text-aifi-black">{item.hw.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-aifi-black">{item.hw.name}</span>
+                            {item.hw.poePowered && (
+                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                PoE
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-aifi-black-60">{item.hw.model}</div>
                         </td>
                         <td className="px-4 py-2.5">
@@ -254,11 +261,13 @@ export function RackConfigurator() {
                             </button>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
+                        <td className={`px-4 py-2.5 text-right tabular-nums ${item.hw.poePowered ? 'text-aifi-black-60 line-through decoration-aifi-black-60/30' : ''}`}>
                           {item.hw.powerWatts * item.quantity}
+                          {item.hw.poePowered && <span className="block text-[10px] text-emerald-600 no-underline font-normal">via PoE</span>}
                         </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
+                        <td className={`px-4 py-2.5 text-right tabular-nums ${item.hw.poePowered ? 'text-aifi-black-60 line-through decoration-aifi-black-60/30' : ''}`}>
                           {item.hw.peakPowerWatts * item.quantity}
+                          {item.hw.poePowered && <span className="block text-[10px] text-emerald-600 no-underline font-normal">via PoE</span>}
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums">
                           {item.hw.rackUnits * item.quantity}
@@ -280,6 +289,18 @@ export function RackConfigurator() {
                   </tbody>
                 </table>
               </div>
+              {/* PoE summary */}
+              {powerCalc.poeDeviceCount > 0 && (
+                <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <svg className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div className="text-xs text-emerald-800">
+                    <span className="font-semibold">{powerCalc.poeDeviceCount} PoE device{powerCalc.poeDeviceCount > 1 ? 's' : ''}</span>
+                    {' '}({powerCalc.poeDeviceWatts}W typical / {powerCalc.poeDevicePeakWatts}W peak) — power drawn from PoE switch budget, not counted separately in mains total.
+                  </div>
+                </div>
+              )}
               {resolvedRackItems.length > 0 && (
                 <div className="mt-3 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={clearItems}>

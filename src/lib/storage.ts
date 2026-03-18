@@ -21,6 +21,7 @@ function rowToHardware(row: Record<string, unknown>): HardwareItem {
     weight_kg: Number(row.weight_kg),
     notes: row.notes as string,
     status: row.status as HardwareItem['status'],
+    poePowered: row.poe_powered === true,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -42,6 +43,7 @@ function hardwareToRow(item: HardwareItem) {
     weight_kg: item.weight_kg,
     notes: item.notes,
     status: item.status,
+    poe_powered: item.poePowered,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
   };

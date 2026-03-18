@@ -12,6 +12,7 @@ export interface HardwareItem {
   weight_kg: number;
   notes: string;
   status: HardwareStatus;
+  poePowered: boolean;          // If true, device draws power via PoE — excluded from mains total
   createdAt: string;
   updatedAt: string;
 }
@@ -82,6 +83,10 @@ export interface PowerCalculation {
   totalRackUnits: number;
   totalWeight_kg: number;
   powerFactor: number;
+  // PoE breakdown — these are already included in switch power, shown for info only
+  poeDeviceWatts: number;       // Total typical power of all PoE devices in the rack
+  poeDevicePeakWatts: number;   // Total peak power of all PoE devices in the rack
+  poeDeviceCount: number;       // Number of PoE-powered items
 }
 
 export interface UPSRecommendation {
