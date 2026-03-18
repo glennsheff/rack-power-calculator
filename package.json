@@ -11,6 +11,7 @@
     "deploy": "vite build && gh-pages -d dist"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.2",
     "@tailwindcss/vite": "^4.2.1",
     "ionicons": "^8.0.13",
     "react": "^19.2.4",

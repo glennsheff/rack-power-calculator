@@ -3,13 +3,15 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
+  useState,
   type ReactNode,
 } from 'react';
 import type { RackConfiguration, RackItem } from '../types';
 import {
   getRackConfigurations,
-  saveRackConfiguration,
-  deleteRackConfiguration as deleteRackConfigFromStorage,
+  saveRackConfiguration as saveRackConfigToDB,
+  deleteRackConfiguration as deleteRackConfigFromDB,
 } from '../lib/storage';
 
 // ---------------------------------------------------------------------------
@@ -148,7 +150,6 @@ function rackReducer(state: RackState, action: RackAction): RackState {
         ...state.currentConfig,
         updatedAt: new Date().toISOString(),
       };
-      saveRackConfiguration(configToSave);
       const existingIdx = state.savedConfigs.findIndex(
         (c) => c.id === configToSave.id,
       );
@@ -176,11 +177,9 @@ function rackReducer(state: RackState, action: RackAction): RackState {
     }
 
     case 'DELETE_CONFIG': {
-      deleteRackConfigFromStorage(action.payload);
       const filtered = state.savedConfigs.filter(
         (c) => c.id !== action.payload,
       );
-      // If we deleted the currently loaded config, reset to a new one
       const currentWasDeleted = state.currentConfig.id === action.payload;
       return {
         ...state,
@@ -207,6 +206,7 @@ function rackReducer(state: RackState, action: RackAction): RackState {
 interface RackContextValue {
   currentConfig: RackConfiguration;
   savedConfigs: RackConfiguration[];
+  loading: boolean;
   updateConfig: (updates: Partial<RackConfiguration>) => void;
   addItem: (hardwareId: string) => void;
   removeItem: (hardwareId: string) => void;
@@ -225,14 +225,27 @@ const RackContext = createContext<RackContextValue | null>(null);
 // ---------------------------------------------------------------------------
 
 export function RackProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(rackReducer, undefined, () => ({
+  const [state, dispatch] = useReducer(rackReducer, {
     currentConfig: createEmptyConfig(),
-    savedConfigs: getRackConfigurations(),
-  }));
+    savedConfigs: [],
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Keep savedConfigs in sync with localStorage when they change via
-  // actions that don't already persist (SET_SAVED is used for external sync).
-  // SAVE_CURRENT and DELETE_CONFIG handle their own persistence inside the reducer.
+  // Load saved configs from Supabase on mount
+  useEffect(() => {
+    async function init() {
+      setLoading(true);
+      try {
+        const configs = await getRackConfigurations();
+        dispatch({ type: 'SET_SAVED', payload: configs });
+      } catch (err) {
+        console.error('Failed to load rack configs:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
 
   const updateConfig = useCallback(
     (updates: Partial<RackConfiguration>) => {
@@ -260,16 +273,24 @@ export function RackProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'CLEAR_ITEMS' });
   }, []);
 
-  const saveCurrentConfig = useCallback(() => {
+  const saveCurrentConfig = useCallback(async () => {
     dispatch({ type: 'SAVE_CURRENT' });
-  }, []);
+    // Persist to Supabase — use current state via a small delay to get the updated config
+    // We need to read from the reducer after dispatch, so we schedule the save
+    const configToSave = {
+      ...state.currentConfig,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveRackConfigToDB(configToSave);
+  }, [state.currentConfig]);
 
   const loadConfig = useCallback((id: string) => {
     dispatch({ type: 'LOAD_CONFIG', payload: id });
   }, []);
 
-  const deleteConfig = useCallback((id: string) => {
+  const deleteConfig = useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_CONFIG', payload: id });
+    await deleteRackConfigFromDB(id);
   }, []);
 
   const newConfig = useCallback(() => {
@@ -281,6 +302,7 @@ export function RackProvider({ children }: { children: ReactNode }) {
       value={{
         currentConfig: state.currentConfig,
         savedConfigs: state.savedConfigs,
+        loading,
         updateConfig,
         addItem,
         removeItem,
