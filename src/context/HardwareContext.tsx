@@ -113,6 +113,14 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
         if (items.length === 0) {
           await bulkUpsertHardware(DEFAULT_HARDWARE);
           items = DEFAULT_HARDWARE;
+        } else {
+          // Upsert any new seed items that don't exist yet in the DB
+          const existingIds = new Set(items.map((i) => i.id));
+          const missing = DEFAULT_HARDWARE.filter((d) => !existingIds.has(d.id));
+          if (missing.length > 0) {
+            await bulkUpsertHardware(missing);
+            items = [...items, ...missing];
+          }
         }
 
         if (!cancelled) {
