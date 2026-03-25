@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backup data (keep restore script, ignore JSON dumps)
+backups/*/*.json
