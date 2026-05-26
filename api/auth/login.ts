@@ -1,43 +1,29 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { verifyPassword, setSessionCookieHeader } from '../_lib/auth.js';
+import { sendJson, sendError, methodNotAllowed } from '../_lib/http.js';
 
-export default async function handler(req: Request): Promise<Response> {
+interface VercelRequest extends IncomingMessage {
+  body?: unknown;
+}
+
+export default async function handler(req: VercelRequest, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'content-type': 'application/json' },
-    });
+    methodNotAllowed(res);
+    return;
   }
 
-  let body: { password?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    });
-  }
-
-  const password = body.password;
+  const body = req.body as { password?: unknown } | undefined;
+  const password = body?.password;
   if (typeof password !== 'string') {
-    return new Response(JSON.stringify({ error: 'password required' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    });
+    sendError(res, 400, 'password required');
+    return;
   }
 
   if (!verifyPassword(password)) {
-    return new Response(JSON.stringify({ ok: false }), {
-      status: 401,
-      headers: { 'content-type': 'application/json' },
-    });
+    sendJson(res, { ok: false }, 401);
+    return;
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: {
-      'content-type': 'application/json',
-      'set-cookie': setSessionCookieHeader(),
-    },
-  });
+  res.setHeader('set-cookie', setSessionCookieHeader());
+  sendJson(res, { ok: true });
 }

@@ -1,18 +1,13 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { clearSessionCookieHeader } from '../_lib/auth.js';
+import { sendJson, methodNotAllowed } from '../_lib/http.js';
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'content-type': 'application/json' },
-    });
+    methodNotAllowed(res);
+    return;
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: {
-      'content-type': 'application/json',
-      'set-cookie': clearSessionCookieHeader(),
-    },
-  });
+  res.setHeader('set-cookie', clearSessionCookieHeader());
+  sendJson(res, { ok: true });
 }

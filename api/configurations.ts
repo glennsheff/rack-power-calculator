@@ -1,20 +1,33 @@
-import { sql, json, badRequest, methodNotAllowed, type ConfigRow } from './_lib/db.js';
-import { isAuthed, unauthorized } from './_lib/auth.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { sql, type ConfigRow } from './_lib/db.js';
+import { isAuthedFromCookie } from './_lib/auth.js';
+import { sendJson, sendError, methodNotAllowed, unauthorized } from './_lib/http.js';
 
-export default async function handler(req: Request): Promise<Response> {
-  if (!isAuthed(req)) return unauthorized();
-  const url = new URL(req.url);
+interface VercelRequest extends IncomingMessage {
+  body?: unknown;
+  query?: Record<string, string | string[]>;
+}
+
+export default async function handler(req: VercelRequest, res: ServerResponse): Promise<void> {
+  if (!isAuthedFromCookie(req.headers.cookie)) {
+    unauthorized(res);
+    return;
+  }
 
   if (req.method === 'GET') {
     const rows = (await sql`
       SELECT * FROM rack_configurations ORDER BY updated_at DESC
     `) as ConfigRow[];
-    return json(rows);
+    sendJson(res, rows);
+    return;
   }
 
   if (req.method === 'POST') {
-    const row = (await req.json()) as ConfigRow;
-    if (!row.id) return badRequest('id is required');
+    const row = req.body as ConfigRow;
+    if (!row?.id) {
+      sendError(res, 400, 'id is required');
+      return;
+    }
     await sql`
       INSERT INTO rack_configurations (
         id, name, store_name, region, items,
@@ -37,15 +50,20 @@ export default async function handler(req: Request): Promise<Response> {
         notes                   = EXCLUDED.notes,
         updated_at              = EXCLUDED.updated_at
     `;
-    return json({ ok: true });
+    sendJson(res, { ok: true });
+    return;
   }
 
   if (req.method === 'DELETE') {
-    const id = url.searchParams.get('id');
-    if (!id) return badRequest('id query param is required');
+    const id = req.query?.id;
+    if (typeof id !== 'string' || id.length === 0) {
+      sendError(res, 400, 'id query param is required');
+      return;
+    }
     await sql`DELETE FROM rack_configurations WHERE id = ${id}`;
-    return json({ ok: true });
+    sendJson(res, { ok: true });
+    return;
   }
 
-  return methodNotAllowed();
+  methodNotAllowed(res);
 }

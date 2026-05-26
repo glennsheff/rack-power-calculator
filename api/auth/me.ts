@@ -1,15 +1,12 @@
-import { isAuthed } from '../_lib/auth.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { isAuthedFromCookie } from '../_lib/auth.js';
+import { sendJson, methodNotAllowed } from '../_lib/http.js';
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'content-type': 'application/json' },
-    });
+    methodNotAllowed(res);
+    return;
   }
 
-  return new Response(JSON.stringify({ authenticated: isAuthed(req) }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
+  sendJson(res, { authenticated: isAuthedFromCookie(req.headers.cookie) });
 }

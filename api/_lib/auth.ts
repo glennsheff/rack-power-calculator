@@ -56,9 +56,10 @@ function verifyCookieValue(value: string | undefined): boolean {
   return timingSafeEqual(sigBuf, expBuf);
 }
 
-function parseCookie(header: string | null, name: string): string | undefined {
-  if (!header) return undefined;
-  for (const part of header.split(';')) {
+export function parseCookie(header: string | string[] | undefined, name: string): string | undefined {
+  const raw = Array.isArray(header) ? header.join('; ') : header;
+  if (!raw) return undefined;
+  for (const part of raw.split(';')) {
     const eq = part.indexOf('=');
     if (eq < 0) continue;
     const k = part.slice(0, eq).trim();
@@ -67,8 +68,8 @@ function parseCookie(header: string | null, name: string): string | undefined {
   return undefined;
 }
 
-export function isAuthed(req: Request): boolean {
-  return verifyCookieValue(parseCookie(req.headers.get('cookie'), SESSION_COOKIE));
+export function isAuthedFromCookie(cookieHeader: string | string[] | undefined): boolean {
+  return verifyCookieValue(parseCookie(cookieHeader, SESSION_COOKIE));
 }
 
 export function setSessionCookieHeader(): string {
@@ -78,11 +79,4 @@ export function setSessionCookieHeader(): string {
 
 export function clearSessionCookieHeader(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
-}
-
-export function unauthorized(): Response {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401,
-    headers: { 'content-type': 'application/json' },
-  });
 }

@@ -1,22 +1,35 @@
-import { sql, json, badRequest, methodNotAllowed, type HardwareRow } from './_lib/db.js';
-import { isAuthed, unauthorized } from './_lib/auth.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { sql, type HardwareRow } from './_lib/db.js';
+import { isAuthedFromCookie } from './_lib/auth.js';
+import { sendJson, sendError, methodNotAllowed, unauthorized } from './_lib/http.js';
 
-export default async function handler(req: Request): Promise<Response> {
-  if (!isAuthed(req)) return unauthorized();
-  const url = new URL(req.url);
+interface VercelRequest extends IncomingMessage {
+  body?: unknown;
+  query?: Record<string, string | string[]>;
+}
+
+export default async function handler(req: VercelRequest, res: ServerResponse): Promise<void> {
+  if (!isAuthedFromCookie(req.headers.cookie)) {
+    unauthorized(res);
+    return;
+  }
 
   if (req.method === 'GET') {
     const rows = (await sql`
       SELECT * FROM hardware_items ORDER BY name
     `) as HardwareRow[];
-    return json(rows);
+    sendJson(res, rows);
+    return;
   }
 
   if (req.method === 'POST') {
-    const body = await req.json();
-    const items: HardwareRow[] = Array.isArray(body) ? body : [body];
+    const body = req.body;
+    const items: HardwareRow[] = Array.isArray(body) ? body : [body as HardwareRow];
     for (const row of items) {
-      if (!row.id) return badRequest('id is required');
+      if (!row?.id) {
+        sendError(res, 400, 'id is required');
+        return;
+      }
       await sql`
         INSERT INTO hardware_items (
           id, name, model, category,
@@ -48,15 +61,20 @@ export default async function handler(req: Request): Promise<Response> {
           updated_at         = EXCLUDED.updated_at
       `;
     }
-    return json({ ok: true, count: items.length });
+    sendJson(res, { ok: true, count: items.length });
+    return;
   }
 
   if (req.method === 'DELETE') {
-    const id = url.searchParams.get('id');
-    if (!id) return badRequest('id query param is required');
+    const id = req.query?.id;
+    if (typeof id !== 'string' || id.length === 0) {
+      sendError(res, 400, 'id query param is required');
+      return;
+    }
     await sql`DELETE FROM hardware_items WHERE id = ${id}`;
-    return json({ ok: true });
+    sendJson(res, { ok: true });
+    return;
   }
 
-  return methodNotAllowed();
+  methodNotAllowed(res);
 }
