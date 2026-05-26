@@ -21,7 +21,15 @@ function PageLoader() {
 }
 
 function AuthenticatedApp() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-aifi-black flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-white/20 border-t-aifi-blue rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <PasswordGate />;

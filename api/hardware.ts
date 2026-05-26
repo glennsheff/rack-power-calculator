@@ -1,6 +1,8 @@
 import { sql, json, badRequest, methodNotAllowed, type HardwareRow } from './_lib/db.js';
+import { isAuthed, unauthorized } from './_lib/auth.js';
 
 export default async function handler(req: Request): Promise<Response> {
+  if (!isAuthed(req)) return unauthorized();
   const url = new URL(req.url);
 
   if (req.method === 'GET') {

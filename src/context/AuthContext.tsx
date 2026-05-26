@@ -1,48 +1,68 @@
 import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
-import { sha256, PASSWORD_HASH } from '../lib/hash';
-
-const SESSION_KEY = 'aifi-rack-authenticated';
 
 interface AuthContextValue {
   isAuthenticated: boolean;
+  loading: boolean;
   login: (password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem(SESSION_KEY) === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Sync state if sessionStorage changes in another tab
+  // Check session on mount via the HttpOnly cookie
   useEffect(() => {
-    const handleStorage = () => {
-      const val = sessionStorage.getItem(SESSION_KEY) === 'true';
-      setIsAuthenticated(val);
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (cancelled) return;
+        if (res.ok) {
+          const data = (await res.json()) as { authenticated: boolean };
+          setIsAuthenticated(data.authenticated === true);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch {
+        if (!cancelled) setIsAuthenticated(false);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const login = useCallback(async (password: string): Promise<boolean> => {
-    const hash = await sha256(password);
-    if (hash === PASSWORD_HASH) {
-      sessionStorage.setItem(SESSION_KEY, 'true');
-      setIsAuthenticated(true);
-      return true;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(SESSION_KEY);
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Best-effort — still clear local state below
+    }
     setIsAuthenticated(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

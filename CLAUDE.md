@@ -17,7 +17,7 @@ An internal AiFi tool hosted on Vercel that enables the non-technical Solutions 
 - **Persistence:** Neon Postgres via Vercel Postgres integration. Accessed through Vercel Functions in `/api`. Schema + seed script live in `/db`.
 - **Routing:** React Router v7 (BrowserRouter with SPA rewrite via `vercel.json`)
 - **Deployment:** Vercel. Branch pushes → preview deploys, `main` → production. No manual deploy step.
-- **Password Gate:** Client-side SHA-256 hash comparison (acceptable for internal low-stakes use)
+- **Password Gate:** Server-side check via Vercel Functions. Password is PBKDF2-hashed (100k iterations, sha256, 32-byte salt) in env var `APP_PASSWORD_HASH`. Successful `/api/auth/login` sets a 30-day HMAC-signed HttpOnly `aifi_session` cookie. `/api/hardware` and `/api/configurations` reject requests without a valid cookie. Required env vars: `APP_PASSWORD_HASH` (salt:hash hex) and `AUTH_SECRET` (≥32 char random).
 - **Font:** Montserrat (Google Fonts) — AiFi brand typeface
 - **Icons:** Ionicons (outlined) — AiFi brand icon set
 
@@ -408,12 +408,13 @@ interface PowerConnector {
 
 ## Password Gate Implementation
 
-- On first visit, show a full-screen password entry page with AiFi branding
-- Password is hashed with SHA-256 and compared against a stored hash
-- On success, set a flag in sessionStorage (clears when browser tab closes)
-- The hash should be stored in an environment variable or config constant
-- Default password for initial deployment: `AiFi-Rack-2024` (document this in README, change before real use)
-- The password gate should be clean and branded — AiFi logo centred, single password field, branded button
+- On first visit, show a full-screen password entry page with AiFi branding.
+- `AuthContext` calls `GET /api/auth/me` on mount to check session via the HttpOnly cookie. Source of truth is the cookie, not local state.
+- Login: `POST /api/auth/login` with `{ password }`. Server PBKDF2-hashes the input and `timingSafeEqual`s against `APP_PASSWORD_HASH`. On match, sets a 30-day HMAC-signed `aifi_session` HttpOnly cookie. Otherwise returns 401.
+- Logout: `POST /api/auth/logout` clears the cookie.
+- All data endpoints (`/api/hardware`, `/api/configurations`) call `isAuthed(req)` first and return 401 if the cookie is missing or invalid.
+- Required env vars: `APP_PASSWORD_HASH` (in `<salt-hex>:<hash-hex>` format), `AUTH_SECRET` (≥32 char random). Both set in Vercel project env, never in the bundle.
+- Helpers live in [api/_lib/auth.ts](api/_lib/auth.ts). Cookie format: `<expiry-ms>.<hmac-hex>`.
 
 ---
 
