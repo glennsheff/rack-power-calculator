@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  useRef,
   type ReactNode,
 } from 'react';
 import type { HardwareItem, HardwareStatus } from '../types';
@@ -16,7 +15,6 @@ import {
   bulkUpsertHardware,
 } from '../lib/storage';
 import { DEFAULT_HARDWARE } from '../data/default-hardware';
-import { supabase } from '../lib/supabase';
 
 // ---------------------------------------------------------------------------
 // State & actions
@@ -98,9 +96,8 @@ const HardwareContext = createContext<HardwareContextValue | null>(null);
 export function HardwareProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(hardwareReducer, { hardware: [] });
   const [loading, setLoading] = useState(true);
-  const initDone = useRef(false);
 
-  // Load hardware from Supabase on mount, seed if empty
+  // Load hardware on mount, seed if empty
   useEffect(() => {
     let cancelled = false;
 
@@ -125,7 +122,6 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
 
         if (!cancelled) {
           dispatch({ type: 'SET', payload: items });
-          initDone.current = true;
         }
       } catch (err) {
         console.error('Failed to initialize hardware:', err);
@@ -138,35 +134,6 @@ export function HardwareProvider({ children }: { children: ReactNode }) {
 
     init();
     return () => { cancelled = true; };
-  }, []);
-
-  // Subscribe to real-time changes from other users (debounced)
-  useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const channel = supabase
-      .channel('hardware-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hardware_items' },
-        () => {
-          // Skip real-time updates until initial load is done
-          if (!initDone.current) return;
-
-          // Debounce: only re-fetch once after a burst of changes
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(async () => {
-            const items = await getHardwareLibrary();
-            dispatch({ type: 'SET', payload: items });
-          }, 500);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const addHardware = useCallback(

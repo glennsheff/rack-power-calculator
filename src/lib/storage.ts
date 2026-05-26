@@ -1,11 +1,11 @@
-import { supabase } from './supabase';
 import type { HardwareItem, RackConfiguration } from '../types';
 
 // ============================================================
-// Hardware Items — Supabase backed
+// API client — talks to /api/hardware and /api/configurations
+// (Vercel Functions backed by Neon Postgres)
 // ============================================================
 
-// Convert DB row (snake_case) → app object (camelCase)
+// snake_case row → camelCase app object
 function rowToHardware(row: Record<string, unknown>): HardwareItem {
   return {
     id: row.id as string,
@@ -27,7 +27,6 @@ function rowToHardware(row: Record<string, unknown>): HardwareItem {
   };
 }
 
-// Convert app object → DB row
 function hardwareToRow(item: HardwareItem) {
   return {
     id: item.id,
@@ -48,56 +47,6 @@ function hardwareToRow(item: HardwareItem) {
     updated_at: item.updatedAt,
   };
 }
-
-export async function getHardwareLibrary(): Promise<HardwareItem[]> {
-  const { data, error } = await supabase
-    .from('hardware_items')
-    .select('*')
-    .order('name');
-
-  if (error) {
-    console.error('Failed to fetch hardware:', error);
-    return [];
-  }
-
-  return (data || []).map(rowToHardware);
-}
-
-export async function upsertHardwareItem(item: HardwareItem): Promise<void> {
-  const { error } = await supabase
-    .from('hardware_items')
-    .upsert(hardwareToRow(item));
-
-  if (error) {
-    console.error('Failed to upsert hardware item:', error);
-  }
-}
-
-export async function deleteHardwareItem(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('hardware_items')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Failed to delete hardware item:', error);
-  }
-}
-
-export async function bulkUpsertHardware(items: HardwareItem[]): Promise<void> {
-  const rows = items.map(hardwareToRow);
-  const { error } = await supabase
-    .from('hardware_items')
-    .upsert(rows);
-
-  if (error) {
-    console.error('Failed to bulk upsert hardware:', error);
-  }
-}
-
-// ============================================================
-// Rack Configurations — Supabase backed
-// ============================================================
 
 function rowToConfig(row: Record<string, unknown>): RackConfiguration {
   return {
@@ -131,37 +80,95 @@ function configToRow(config: RackConfiguration) {
   };
 }
 
-export async function getRackConfigurations(): Promise<RackConfiguration[]> {
-  const { data, error } = await supabase
-    .from('rack_configurations')
-    .select('*')
-    .order('updated_at', { ascending: false });
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) {
+    throw new Error(`${init?.method ?? 'GET'} ${url} → ${res.status}: ${await res.text()}`);
+  }
+  return res.json() as Promise<T>;
+}
 
-  if (error) {
-    console.error('Failed to fetch rack configs:', error);
+// ============================================================
+// Hardware Items
+// ============================================================
+
+export async function getHardwareLibrary(): Promise<HardwareItem[]> {
+  try {
+    const rows = await request<Record<string, unknown>[]>('/api/hardware');
+    return rows.map(rowToHardware);
+  } catch (err) {
+    console.error('Failed to fetch hardware:', err);
     return [];
   }
+}
 
-  return (data || []).map(rowToConfig);
+export async function upsertHardwareItem(item: HardwareItem): Promise<void> {
+  try {
+    await request<{ ok: true }>('/api/hardware', {
+      method: 'POST',
+      body: JSON.stringify(hardwareToRow(item)),
+    });
+  } catch (err) {
+    console.error('Failed to upsert hardware item:', err);
+  }
+}
+
+export async function deleteHardwareItem(id: string): Promise<void> {
+  try {
+    await request<{ ok: true }>(`/api/hardware?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {
+    console.error('Failed to delete hardware item:', err);
+  }
+}
+
+export async function bulkUpsertHardware(items: HardwareItem[]): Promise<void> {
+  if (items.length === 0) return;
+  try {
+    await request<{ ok: true }>('/api/hardware', {
+      method: 'POST',
+      body: JSON.stringify(items.map(hardwareToRow)),
+    });
+  } catch (err) {
+    console.error('Failed to bulk upsert hardware:', err);
+  }
+}
+
+// ============================================================
+// Rack Configurations
+// ============================================================
+
+export async function getRackConfigurations(): Promise<RackConfiguration[]> {
+  try {
+    const rows = await request<Record<string, unknown>[]>('/api/configurations');
+    return rows.map(rowToConfig);
+  } catch (err) {
+    console.error('Failed to fetch rack configs:', err);
+    return [];
+  }
 }
 
 export async function saveRackConfiguration(config: RackConfiguration): Promise<void> {
-  const { error } = await supabase
-    .from('rack_configurations')
-    .upsert(configToRow(config));
-
-  if (error) {
-    console.error('Failed to save rack config:', error);
+  try {
+    await request<{ ok: true }>('/api/configurations', {
+      method: 'POST',
+      body: JSON.stringify(configToRow(config)),
+    });
+  } catch (err) {
+    console.error('Failed to save rack config:', err);
   }
 }
 
 export async function deleteRackConfiguration(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('rack_configurations')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Failed to delete rack config:', error);
+  try {
+    await request<{ ok: true }>(`/api/configurations?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {
+    console.error('Failed to delete rack config:', err);
   }
 }

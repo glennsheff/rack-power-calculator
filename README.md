@@ -1,73 +1,61 @@
-# React + TypeScript + Vite
+# AiFi Rack Power Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Internal AiFi tool for the Solutions team — calculates UPS sizing, mains power, and cooling requirements for comms/server racks deployed in retail stores and venues.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + TypeScript + Vite
+- Tailwind CSS v4
+- React Router v7 (BrowserRouter)
+- Neon Postgres (via Vercel Postgres integration)
+- Deployed on Vercel
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install
+npm install --legacy-peer-deps
 
-## Expanding the ESLint configuration
+# Pull env vars from Vercel (one-time, requires `vercel link` first)
+npx vercel env pull .env.local
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Dev server (Vite only — API functions don't run)
+npm run dev
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Dev server with API functions
+npx vercel dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Use `vercel dev` when you need to exercise the `/api/*` endpoints; plain `vite` is faster for UI-only work.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Database setup
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+First-time setup of the Neon database (creates tables and seeds data from the latest `backups/` snapshot):
+
+```bash
+npm run db:setup
 ```
+
+See [`db/README.md`](db/README.md) for the full setup walkthrough.
+
+## Deployment
+
+Pushed branches deploy automatically to Vercel previews. Merges to `main` go to production. There is no manual deploy step.
+
+## Project structure
+
+```
+api/                  Vercel Functions (Neon Postgres-backed CRUD)
+db/                   Schema + seed script
+src/
+  components/         UI components (calculator, hardware, layout, ui)
+  context/            React Context providers
+  data/               Static data (UPS models, power connectors, default hardware)
+  lib/                Calculations, storage client, export, hash
+  pages/              Top-level pages
+  types/              Shared TypeScript types
+backups/              JSON snapshots of the Neon DB
+public/assets/        AiFi logos
+```
+
+See [`CLAUDE.md`](CLAUDE.md) for the full project brief, design system, and calculation logic.

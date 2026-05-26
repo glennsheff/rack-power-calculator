@@ -2,21 +2,21 @@
 
 ## Project Overview
 
-An internal AiFi tool hosted on GitHub Pages that enables the non-technical Solutions team to correctly spec out power, UPS, and cooling requirements for comms/server racks deployed in retail stores and venues. The tool calculates UPS sizing (with model recommendations), mains power connection requirements, and air conditioning needs based on the hardware selected for a given deployment.
+An internal AiFi tool hosted on Vercel that enables the non-technical Solutions team to correctly spec out power, UPS, and cooling requirements for comms/server racks deployed in retail stores and venues. The tool calculates UPS sizing (with model recommendations), mains power connection requirements, and air conditioning needs based on the hardware selected for a given deployment.
 
-**Live URL:** `https://aifi.github.io/rack-power-calculator/` (or similar org-level GitHub Pages URL)
+**Live URL:** Vercel production URL (custom domain TBD)
 
 ---
 
 ## Tech Stack
 
-- **Framework:** React 18+ with TypeScript
-- **Build Tool:** Vite
-- **Styling:** Tailwind CSS v3 (with AiFi brand tokens as CSS custom properties)
+- **Framework:** React 19 with TypeScript
+- **Build Tool:** Vite 8
+- **Styling:** Tailwind CSS v4 (with AiFi brand tokens as CSS custom properties)
 - **State Management:** React Context + useReducer (no external state library needed)
-- **Persistence:** localStorage for hardware library + JSON import/export for sharing
-- **Routing:** React Router v6 (hash-based routing for GitHub Pages compatibility)
-- **Deployment:** GitHub Pages via `gh-pages` branch (Vite build output)
+- **Persistence:** Neon Postgres via Vercel Postgres integration. Accessed through Vercel Functions in `/api`. Schema + seed script live in `/db`.
+- **Routing:** React Router v7 (BrowserRouter with SPA rewrite via `vercel.json`)
+- **Deployment:** Vercel. Branch pushes → preview deploys, `main` → production. No manual deploy step.
 - **Password Gate:** Client-side SHA-256 hash comparison (acceptable for internal low-stakes use)
 - **Font:** Montserrat (Google Fonts) — AiFi brand typeface
 - **Icons:** Ionicons (outlined) — AiFi brand icon set
@@ -78,6 +78,17 @@ All UI must follow the AiFi Brand Style Guide. Key tokens:
 
 ```
 rack-power-calculator/
+├── api/                              # Vercel Functions (Neon Postgres CRUD)
+│   ├── _lib/
+│   │   └── db.ts                    # Shared Neon client + types + response helpers
+│   ├── hardware.ts                  # GET/POST/DELETE /api/hardware
+│   ├── configurations.ts            # GET/POST/DELETE /api/configurations
+│   └── tsconfig.json
+├── db/
+│   ├── schema.sql                   # Table DDL (idempotent)
+│   ├── seed.js                      # Apply schema + import latest backup
+│   └── README.md
+├── vercel.json                       # SPA rewrite for client-side routing
 ├── public/
 │   ├── assets/
 │   │   ├── AiFi-LogoH-Main.svg
@@ -167,15 +178,17 @@ interface HardwareItem {
   rackUnits: number;             // Height in U
   weight_kg: number;             // Weight in kg
   notes: string;                 // Free text for any caveats
-  isActive: boolean;             // Soft delete / hide from selector
+  status: HardwareStatus;        // 'active' | 'in-testing' | 'eol'
+  poePowered: boolean;           // If true, device draws power via PoE — excluded from mains total
   createdAt: string;             // ISO date
   updatedAt: string;             // ISO date
 }
 
-type HardwareCategory = 
+type HardwareCategory =
   | 'server'
   | 'switch'
-  | 'camera-controller'
+  | 'camera'
+  | 'controller'
   | 'ups'
   | 'pdu'
   | 'storage'
@@ -183,6 +196,8 @@ type HardwareCategory =
   | 'display'
   | 'accessory'
   | 'other';
+
+type HardwareStatus = 'active' | 'in-testing' | 'eol';
 
 // === Rack Configuration ===
 
@@ -671,10 +686,12 @@ Pre-populate the hardware library with common AiFi deployment hardware:
 
 ## Implementation Notes
 
-### GitHub Pages Considerations
-- Use `HashRouter` (not `BrowserRouter`) — GitHub Pages doesn't support SPA fallback routing
-- Set `base` in `vite.config.ts` to the repo name: `base: '/rack-power-calculator/'`
-- Add a `deploy` script: `"deploy": "vite build && gh-pages -d dist"`
+### Vercel Deployment
+- `vercel.json` rewrites all non-`/api/*` routes to `/` for SPA client-side routing.
+- `BrowserRouter` from `react-router-dom` (clean URLs like `/calculator`).
+- No `base` path in `vite.config.ts` — served from root.
+- API functions in `/api/*.ts` are deployed as Vercel Functions automatically.
+- Neon Postgres provisioned via the Vercel Postgres integration; `DATABASE_URL` injected automatically.
 
 ### Responsive Design
 - Primary target: desktop/laptop browsers (this is an office tool)
@@ -704,21 +721,26 @@ Pre-populate the hardware library with common AiFi deployment hardware:
 ## Development Workflow
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (legacy-peer-deps needed for tailwind/vite peer conflict)
+npm install --legacy-peer-deps
 
-# Dev server
+# Pull env vars from Vercel
+npx vercel env pull .env.local
+
+# Dev server (UI only — API functions don't run)
 npm run dev
+
+# Dev server with /api/* functions
+npx vercel dev
 
 # Build for production
 npm run build
 
-# Preview production build
-npm run preview
-
-# Deploy to GitHub Pages
-npm run deploy
+# Apply schema and seed Neon from the latest backup
+npm run db:setup
 ```
+
+Deployment is automatic via Vercel: branch pushes create preview deploys, `main` merges go to production.
 
 ---
 
