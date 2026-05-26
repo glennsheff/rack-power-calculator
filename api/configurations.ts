@@ -1,4 +1,4 @@
-import { sql, json, badRequest, methodNotAllowed, type ConfigRow } from './_lib/db.ts';
+import { sql, json, badRequest, methodNotAllowed, type ConfigRow } from './_lib/db.js';
 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
