@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { HardwareProvider } from './context/HardwareContext';
 import { RackProvider } from './context/RackContext';
@@ -87,6 +88,7 @@ export default function App() {
           <AuthenticatedApp />
         </AuthProvider>
       </ToastProvider>
+      <Analytics />
     </BrowserRouter>
   );
 }
